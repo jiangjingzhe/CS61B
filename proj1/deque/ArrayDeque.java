@@ -9,14 +9,14 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T>{
     private int size;
     private int capacity;
 
-    ArrayDeque(){
+    public ArrayDeque(){
         data = (T[]) new Object[8];
         front = 4;
         rear = 5;
         size = 0;
         capacity = 8;
     }
-     ArrayDeque(T t){
+     public ArrayDeque(T t){
          data = (T[]) new Object[8];
          front = 4;
          data[front--] = t;
