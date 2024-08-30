@@ -16,14 +16,14 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T>{
         size = 0;
         capacity = 8;
     }
-     public ArrayDeque(T t){
-         data = (T[]) new Object[8];
-         front = 4;
-         data[front--] = t;
-         rear = 5;
-         size = 1;
-         capacity = 8;
-     }
+//     public ArrayDeque(T t){
+//         data = (T[]) new Object[8];
+//         front = 4;
+//         data[front--] = t;
+//         rear = 5;
+//         size = 1;
+//         capacity = 8;
+//     }
 
     private void resize(int num){
         T[] newData = (T[]) new Object[num];
@@ -129,7 +129,7 @@ public class ArrayDeque<T> implements Deque<T>, Iterable<T>{
 
         for (int i = 0; i < size; i++) {
             Object item = ((Deque<?>) o).get(i);
-            if (item != get(i)) {
+            if (!item.equals(get(i))) {
                 return false;
             }
         }
