@@ -161,6 +161,10 @@ public class ArrayDequeTest {
     public void equalsTest() {
         ArrayDeque<Integer> ad1 = new ArrayDeque<>();
         ArrayDeque<Integer> ad2 = new ArrayDeque<>();
+        LinkedListDeque<Integer> ad3 = new LinkedListDeque<>();
+
+        ad3.addLast(0);
+        ad3.addLast(1);
 
         ad1.addLast(0);
         ad2.addLast(0);
@@ -171,6 +175,9 @@ public class ArrayDequeTest {
 
         ad2.addLast(2);
         assertNotEquals(ad1, ad2);
+        ad1.printDeque();
+        ad2.printDeque();
+        assertEquals(ad1,ad3);
     }
 
     @Test

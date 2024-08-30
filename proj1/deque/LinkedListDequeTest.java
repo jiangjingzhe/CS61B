@@ -208,4 +208,17 @@ public class LinkedListDequeTest {
             }
         }
     }
+    @Test
+    public void equalTest(){
+        LinkedListDeque<String> l1 = new LinkedListDeque<>();
+        LinkedListDeque<String> l2 = new LinkedListDeque<>();
+        l1.addFirst("qaz");
+        l1.addLast("bcd");
+        l2.addFirst("qaz");
+        l2.addLast("bcd");
+        System.out.println(l2.equals(l1));
+        l1.printDeque();
+        l2.printDeque();
+        assertTrue(l1.equals(l2));
+    }
 }
