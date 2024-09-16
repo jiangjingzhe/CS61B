@@ -10,6 +10,11 @@ public class Main {
      */
     public static void main(String[] args) {
         // TODO: what if args is empty?
+        if(args == null){
+            System.out.println("Please enter a commend.");
+            System.exit(0);
+        }
+        Repository repo = new Repository();
         String firstArg = args[0];
         switch(firstArg) {
             case "init":
