@@ -2,6 +2,9 @@ package gitlet;
 
 import javax.swing.plaf.PanelUI;
 import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
 import static gitlet.Utils.*;
 
 // TODO: any imports you need here
@@ -57,12 +60,40 @@ public class Repository {
         OBJECT_DIR.mkdirs();
         REFS_DIR.mkdirs();
         HEADS_DIR.mkdirs();
-        //TODO: 初始化其他目录
-
+        initCommit();
+        initHEAD();
+        initHeads();
     }
     private static void initCommit(){
         Commit initCommit = new Commit();
         currcommit = initCommit;
         initCommit.save();
     }
+    private static void initHEAD(){
+        writeContents(HEAD_FILE, "master");
+    }
+    private static void initHeads(){
+        File HEADS_FILE = join(HEADS_DIR, "master");
+        writeContents(HEADS_FILE, currcommit.getId());
+    }
+    public static void checkIfInitialized(){
+        if(!GITLET_DIR.exists()){
+            System.out.println("Not in an initialized Gitlet directory.");
+            System.exit(0);
+        }
+    }
+    public static void add(String fileName){
+        File file = getFileFromCWD(fileName);
+        if(!file.exists()){
+            System.out.println("File does not exist.");
+            System.exit(0);
+        }
+        Blob blob = new Blob(file);
+        //TODO:
+    }
+    //判断是绝对路径还是相对路径
+    private static File getFileFromCWD(String fileName) {
+        return Paths.get(fileName).isAbsolute() ? new File(fileName) : join(CWD, fileName);
+    }
+
 }

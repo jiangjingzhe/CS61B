@@ -35,6 +35,7 @@ public class Commit implements Serializable {
     private Date currTime;
     private String id;
     private File commitSavaFile;
+    private String timeStamp;
 
     public String getMessage() {
         return message;
@@ -64,8 +65,6 @@ public class Commit implements Serializable {
         return timeStamp;
     }
 
-    private String timeStamp;
-
     /* TODO: fill in the rest of this class. */
     public Commit(String message, Map<String, String> pathToBlobID, List<String> parents){
         this.message = message;
@@ -78,7 +77,13 @@ public class Commit implements Serializable {
     }
 
     public Commit(){
-        this("initial commit", new HashMap<>(), new ArrayList<>());
+        this.message = "initial commit";
+        this.pathToBlobID = new HashMap<>();
+        this.parents = new ArrayList<>();
+        this.currTime = new Date(0);
+        this.timeStamp = dateToTimeStamp(this.currTime);
+        this.id = generateID();
+        this.commitSavaFile = generateFile();
     }
 
     private File generateFile() {
@@ -86,11 +91,16 @@ public class Commit implements Serializable {
     }
 
     private String generateID() {
-        return Utils.sha1(dateToTimeStamp(currTime), message, parents.toString(), pathToBlobID.toString());
+        return Utils.sha1(timeStamp, message, parents.toString(), pathToBlobID.toString());
     }
 
     private static String dateToTimeStamp(Date currTime) {
-        DateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.CHINA);
+        DateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.US);
         return dateFormat.format(currTime);
     }
+
+    public void save(){
+        writeObject(commitSavaFile, this);
+    }
+
 }
