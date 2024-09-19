@@ -48,7 +48,9 @@ public class Repository {
     public static final File ADDSTAGE_FILE = join(GITLET_DIR, "add_stage");
     public static final File REMOVESTAGE_FILE = join(GITLET_DIR, "remove_stage");
 
-    public static Commit currcommit;
+    public static Commit currCommit;
+    public static Stage addStage;
+    public static Stage removeStage;
     public static String currBranch;
 
     public static void init(){
@@ -66,7 +68,7 @@ public class Repository {
     }
     private static void initCommit(){
         Commit initCommit = new Commit();
-        currcommit = initCommit;
+        currCommit = initCommit;
         initCommit.save();
     }
     private static void initHEAD(){
@@ -74,7 +76,7 @@ public class Repository {
     }
     private static void initHeads(){
         File HEADS_FILE = join(HEADS_DIR, "master");
-        writeContents(HEADS_FILE, currcommit.getId());
+        writeContents(HEADS_FILE, currCommit.getId());
     }
     public static void checkIfInitialized(){
         if(!GITLET_DIR.exists()){
@@ -89,11 +91,55 @@ public class Repository {
             System.exit(0);
         }
         Blob blob = new Blob(file);
-        //TODO:
+        storeBlob(blob);
     }
     //判断是绝对路径还是相对路径
     private static File getFileFromCWD(String fileName) {
         return Paths.get(fileName).isAbsolute() ? new File(fileName) : join(CWD, fileName);
     }
 
+    private static void storeBlob(Blob blob){
+        currCommit = readCurrCommit();
+        addStage = readStage(ADDSTAGE_FILE);
+        removeStage = readStage(REMOVESTAGE_FILE);
+        //如果currcommit里面没有,并且addstage里面没有
+        if(!currCommit.getPathToBlobID().containsValue(blob.getId())
+                && addStage.isNewBlob(blob)){
+            //removestage里没有
+            if(!removeStage.isNewBlob(blob)){
+                removeStage.delete(blob);
+                removeStage.saveAddStage();
+            }
+            blob.save();
+            if(addStage.isFilePathExists(blob.getFilePath())){
+                addStage.delete(blob.getFilePath());
+            }
+            addStage.add(blob);
+            addStage.saveAddStage();
+
+        }
+    }
+
+    private static Commit readCurrCommit(){
+        String currCommitId = readCurrCommitId();
+        File CURR_COMMIT_FILE = join(OBJECT_DIR, currCommitId);
+        return readObject(CURR_COMMIT_FILE, Commit.class);
+    }
+
+    private static String readCurrCommitId(){
+        String currBranch = readCurrBranch();
+        File HEADS_FILE = join(HEADS_DIR, currBranch);
+        return readContentsAsString(HEADS_FILE);
+    }
+
+    private static String readCurrBranch(){
+        return readContentsAsString(HEAD_FILE);
+    }
+
+    private static Stage readStage(File stageFile){
+        if(!stageFile.exists()){
+            return new Stage();
+        }
+        return readObject(stageFile, Stage.class);
+    }
 }

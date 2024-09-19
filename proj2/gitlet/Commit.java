@@ -94,7 +94,7 @@ public class Commit implements Serializable {
         return Utils.sha1(timeStamp, message, parents.toString(), pathToBlobID.toString());
     }
 
-    private static String dateToTimeStamp(Date currTime) {
+    private String dateToTimeStamp(Date currTime) {
         DateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.US);
         return dateFormat.format(currTime);
     }
