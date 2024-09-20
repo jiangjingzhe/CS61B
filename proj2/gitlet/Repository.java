@@ -4,6 +4,9 @@ import javax.swing.plaf.PanelUI;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static gitlet.Utils.*;
 
@@ -33,11 +36,11 @@ public class Repository {
     /*
      *   .gitlet
      *      |--objects
-     *      |     |--commit and blob
+     *      |     |--commit and blob (文件名是commitId和blobId)
      *      |--refs
      *      |    |--heads
-     *      |         |--master
-     *      |--HEAD
+     *      |         |--master ->(记录当前分支最新的commitId)
+     *      |--HEAD ->(记录currBranch)
      *      |--stage
      */
     // .gitlet directory
@@ -105,17 +108,17 @@ public class Repository {
         //如果currcommit里面没有,并且addstage里面没有
         if(!currCommit.getPathToBlobID().containsValue(blob.getId())
                 && addStage.isNewBlob(blob)){
-            //removestage里没有
+            //removestage里有
             if(!removeStage.isNewBlob(blob)){
                 removeStage.delete(blob);
-                removeStage.saveAddStage();
+                removeStage.saveStage(REMOVESTAGE_FILE);
             }
             blob.save();
             if(addStage.isFilePathExists(blob.getFilePath())){
                 addStage.delete(blob.getFilePath());
             }
             addStage.add(blob);
-            addStage.saveAddStage();
+            addStage.saveStage(ADDSTAGE_FILE);
 
         }
     }
@@ -128,8 +131,7 @@ public class Repository {
 
     private static String readCurrCommitId(){
         String currBranch = readCurrBranch();
-        File HEADS_FILE = join(HEADS_DIR, currBranch);
-        return readContentsAsString(HEADS_FILE);
+        return readContentsAsString(join(HEADS_DIR, currBranch));
     }
 
     private static String readCurrBranch(){
@@ -141,5 +143,58 @@ public class Repository {
             return new Stage();
         }
         return readObject(stageFile, Stage.class);
+    }
+
+    public static void commit(String arg) {
+        if (arg.equals("")){
+            System.out.println("Please enter a commit message.");
+            System.exit(0);
+        }
+        Commit newCommit = newCommit(arg);
+        currCommit = newCommit;
+        saveNewCommit(newCommit);
+    }
+
+    private static void saveNewCommit(Commit newCommit) {
+        newCommit.save();
+        addStage.clear();
+        removeStage.clear();
+        addStage.saveStage(ADDSTAGE_FILE);
+        removeStage.saveStage(REMOVESTAGE_FILE);
+        String currBranch = readCurrBranch();
+        writeContents(join(HEADS_DIR, currBranch), currCommit.getId());
+    }
+
+    private static Commit newCommit(String arg) {
+        currCommit = readCurrCommit();
+        Map<String, String> addBlobMap = findBlobMap(ADDSTAGE_FILE);
+        Map<String, String> removeBlobMap = findBlobMap(REMOVESTAGE_FILE);
+        Map<String, String> currCommitMap = currCommit.getPathToBlobID();
+        Map<String, String> commitBlobMap = generateNewMap(currCommitMap, addBlobMap, removeBlobMap);
+        List<String> parents = new ArrayList<>();
+        parents.add(currCommit.getId());
+        return new Commit(arg, commitBlobMap, parents);
+    }
+
+    private static Map<String, String> generateNewMap(Map<String, String> currCommitMap, Map<String, String> addBlobMap, Map<String, String> removeBlobMap) {
+        if(addBlobMap.isEmpty() && removeBlobMap.isEmpty()){
+            System.out.println("No changes added to the commit.");
+            System.exit(0);
+        }
+        // 1. 加入 addBlobMap 的所有键值对到 currCommitMap 中
+        for (Map.Entry<String, String> entry : addBlobMap.entrySet()) {
+            currCommitMap.put(entry.getKey(), entry.getValue());
+        }
+
+        // 2. 从 currCommitMap 中移除 removeBlobMap 的所有键
+        for (String key : removeBlobMap.keySet()) {
+            currCommitMap.remove(key);
+        }
+
+        return currCommitMap;
+    }
+
+    private static Map<String, String> findBlobMap(File stageFile) {
+        return readStage(stageFile).getPathToBlobID();
     }
 }

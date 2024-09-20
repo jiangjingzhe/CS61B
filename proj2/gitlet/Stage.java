@@ -41,12 +41,8 @@ public class Stage implements Serializable {
         pathToBlobID.put(blob.getFilePath(), blob.getId());
     }
 
-    public void saveAddStage(){
-        writeObject(Repository.ADDSTAGE_FILE, this);
-    }
-
-    public void saveRemoveStage(){
-        writeObject(Repository.REMOVESTAGE_FILE, this);
+    public void saveStage(File stageFile){
+        writeObject(stageFile, this);
     }
 
     public void clear(){
