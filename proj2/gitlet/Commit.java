@@ -30,8 +30,10 @@ public class Commit implements Serializable {
 
     /** The message of this Commit. */
     private String message;
+    //filePath -> BlobId
+    //filePath是绝对路径
     private Map<String, String> pathToBlobID = new HashMap<>();
-    private List<String> parents;
+    private List<String> parents;//parents commit id 是一个链表，如果List.size()==2说明是Merge之后的
     private Date currTime;
     private String id;
     private File commitSavaFile;
@@ -101,6 +103,18 @@ public class Commit implements Serializable {
 
     public void save(){
         writeObject(commitSavaFile, this);
+    }
+
+    public boolean exists(String fileName){
+        return pathToBlobID.containsKey(fileName);
+    }
+
+    public static Set<String> getBlobIdSet(Commit commit){
+        Set<String> blobIdSet = new HashSet<>();
+        for(String id : commit.pathToBlobID.values()){
+            blobIdSet.add(id);
+        }
+        return blobIdSet;
     }
 
 }

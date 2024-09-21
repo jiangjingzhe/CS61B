@@ -31,6 +31,46 @@ public class Main {
                 validArgs(args, 2);
                 Repository.checkIfInitialized();
                 Repository.commit(args[1]);
+                break;
+            case "rm":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.rm(args[1]);
+                break;
+            case "log":
+                validArgs(args, 1);
+                Repository.checkIfInitialized();
+                Repository.log();
+                break;
+            case "checkout":
+                Repository.checkIfInitialized();
+                Repository repo = new Repository();
+                switch (args.length){
+                    case 2:/* * checkout [branch name] */
+                        repo.checkoutBranch(args[1]);
+                        break;
+                    case 3:/* * checkout -- [file name] */
+                        if(!args[1].equals("--")){
+                            System.out.println("Incorrect operands.");
+                            System.exit(0);
+                        }
+                        repo.checkout(args[2]);
+                        break;
+                    case 4:/* * checkout [commit id] -- [file name] */
+                        if(!args[2].equals("--")){
+                            System.out.println("Incorrect operands.");
+                            System.exit(0);
+                        }
+                        repo.checkout(args[1], args[3]);
+                        break;
+                    default:
+                        System.out.println("Incorrect operands.");
+                        System.exit(0);
+                }
+                break;
+            default:
+                System.out.println("No command with that name exists.");
+                System.exit(0);
         }
     }
     private static void validArgs(String[] args, int num){

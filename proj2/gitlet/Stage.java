@@ -13,6 +13,7 @@ import static gitlet.Utils.*;
 
 public class Stage implements Serializable {
     //filePath -> BlobId
+    //filePath是绝对路径
     private Map<String, String> pathToBlobID = new HashMap<>();
 
     public boolean isNewBlob(Blob blob){
@@ -57,7 +58,7 @@ public class Stage implements Serializable {
         return blobList;
     }
 
-    public Blob getBlobById(String id) {
+    public static Blob getBlobById(String id) {
         return readObject(join(OBJECT_DIR, id), Blob.class);
     }
 
