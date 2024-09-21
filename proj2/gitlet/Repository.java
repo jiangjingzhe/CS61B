@@ -1,8 +1,5 @@
 package gitlet;
 
-import afu.org.checkerframework.checker.oigj.qual.O;
-
-import javax.swing.plaf.PanelUI;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -161,10 +158,7 @@ public class Repository {
 
     private static void saveNewCommit(Commit newCommit) {
         newCommit.save();
-        addStage.clear();
-        removeStage.clear();
-        addStage.saveStage(ADDSTAGE_FILE);
-        removeStage.saveStage(REMOVESTAGE_FILE);
+        clearAllStage();
         String currBranch = readCurrBranch();
         writeContents(join(HEADS_DIR, currBranch), currCommit.getId());
     }
@@ -254,24 +248,24 @@ public class Repository {
 
     private static void printMergeCommit(Commit commit) {
         System.out.println("===");
-        System.out.println("commit" + commit.getId());
+        System.out.println("commit " + commit.getId());
         String parent1 = commit.getParents().get(0);
         String parent2 = commit.getParents().get(1);
         System.out.println("Merge: " + parent1.substring(0, 7) + " " + parent2.substring(0, 7));
-        System.out.println("Date:" + commit.getTimeStamp());
+        System.out.println("Date: " + commit.getTimeStamp());
         System.out.println(commit.getMessage());
         System.out.println();
     }
 
     private static void printCommit(Commit commit){
         System.out.println("===");
-        System.out.println("commit" + commit.getId());
-        System.out.println("Date:" + commit.getTimeStamp());
+        System.out.println("commit " + commit.getId());
+        System.out.println("Date: " + commit.getTimeStamp());
         System.out.println(commit.getMessage());
         System.out.println();
     }
 
-    public void checkoutBranch(String branchName) {
+    public static void checkoutBranch(String branchName) {
         /* * checkout [branch name] */
         currBranch = readCurrBranch();
         if(branchName.equals(currBranch)){
@@ -289,10 +283,10 @@ public class Repository {
         changeBranch(branchName);
     }
 
-    private void changeBranch(String branchName) {
+    private static void changeBranch(String branchName) {
     }
 
-    private void changeCommit(Commit newCommit) {
+    private static void changeCommit(Commit newCommit) {
         Set<String> currBlobId = getBlobIdSet(currCommit);
         Set<String> newBlobId = getBlobIdSet(newCommit);
 
@@ -313,7 +307,7 @@ public class Repository {
         clearAllStage();
     }
 
-    private void clearAllStage() {
+    private static void clearAllStage() {
         addStage = readStage(ADDSTAGE_FILE);
         removeStage = readStage(REMOVESTAGE_FILE);
         addStage.clear();
