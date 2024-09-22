@@ -9,7 +9,7 @@ public class Main {
      *  <COMMAND> <OPERAND1> <OPERAND2> ... 
      */
     public static void main(String[] args) {
-        if(args == null){
+        if(args.length == 0){
             System.out.println("Please enter a commend.");
             System.exit(0);
         }
@@ -78,6 +78,22 @@ public class Main {
                 validArgs(args, 2);
                 Repository.checkIfInitialized();
                 Repository.find(args[1]);
+                break;
+            case "branch":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.branch(args[1]);
+                break;
+            case "rm-branch":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.rm_branch(args[1]);
+                break;
+            case "reset":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.reset(args[1]);
+                break;
             default:
                 System.out.println("No command with that name exists.");
                 System.exit(0);
