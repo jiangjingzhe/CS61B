@@ -9,7 +9,6 @@ public class Main {
      *  <COMMAND> <OPERAND1> <OPERAND2> ... 
      */
     public static void main(String[] args) {
-        // TODO: what if args is empty?
         if(args == null){
             System.out.println("Please enter a commend.");
             System.exit(0);
@@ -17,12 +16,10 @@ public class Main {
         String firstArg = args[0];
         switch(firstArg) {
             case "init":
-                // TODO: handle the `init` command
                 validArgs(args, 1);
                 Repository.init();
                 break;
             case "add":
-                // TODO: handle the `add [filename]` command
                 validArgs(args, 2);
                 Repository.checkIfInitialized();
                 Repository.add(args[1]);
@@ -44,30 +41,43 @@ public class Main {
                 break;
             case "checkout":
                 Repository.checkIfInitialized();
-                Repository repo = new Repository();
                 switch (args.length){
                     case 2:/* * checkout [branch name] */
-                        repo.checkoutBranch(args[1]);
+                        Repository.checkoutBranch(args[1]);
                         break;
                     case 3:/* * checkout -- [file name] */
                         if(!args[1].equals("--")){
                             System.out.println("Incorrect operands.");
                             System.exit(0);
                         }
-                        repo.checkout(args[2]);
+                        Repository.checkout(args[2]);
                         break;
                     case 4:/* * checkout [commit id] -- [file name] */
                         if(!args[2].equals("--")){
                             System.out.println("Incorrect operands.");
                             System.exit(0);
                         }
-                        repo.checkout(args[1], args[3]);
+                        Repository.checkout(args[1], args[3]);
                         break;
                     default:
                         System.out.println("Incorrect operands.");
                         System.exit(0);
                 }
                 break;
+            case "status":
+                validArgs(args, 1);
+                Repository.checkIfInitialized();
+                Repository.status();
+                break;
+            case "global-log":
+                validArgs(args, 1);
+                Repository.checkIfInitialized();
+                Repository.global_log();
+                break;
+            case "find":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.find(args[1]);
             default:
                 System.out.println("No command with that name exists.");
                 System.exit(0);

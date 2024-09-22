@@ -1,10 +1,7 @@
 package gitlet;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.io.File;
 
 import static gitlet.Repository.OBJECT_DIR;
@@ -57,6 +54,14 @@ public class Stage implements Serializable {
         return blobList;
     }
 
+    public Set<String> getBlobIdSet(){
+        Set<String> blobIdSet = new HashSet<>();
+        for(String id : this.pathToBlobID.values()){
+            blobIdSet.add(id);
+        }
+        return blobIdSet;
+    }
+
     public static Blob getBlobById(String id) {
         return readObject(join(OBJECT_DIR, id), Blob.class);
     }
@@ -66,7 +71,7 @@ public class Stage implements Serializable {
     }
 
     public boolean exists(String fileName){
-        return pathToBlobID.containsKey(fileName);
+        return this.pathToBlobID.containsKey(fileName);
     }
     public Blob getBlobByPath(String path){
         return getBlobById(pathToBlobID.get(path));

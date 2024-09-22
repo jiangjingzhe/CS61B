@@ -106,7 +106,7 @@ public class Commit implements Serializable {
     }
 
     public boolean exists(String fileName){
-        return pathToBlobID.containsKey(fileName);
+        return this.pathToBlobID.containsKey(fileName);
     }
 
     public static Set<String> getBlobIdSet(Commit commit){

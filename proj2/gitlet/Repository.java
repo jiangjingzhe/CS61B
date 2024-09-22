@@ -2,11 +2,9 @@ package gitlet;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
-import static gitlet.Commit.getBlobIdSet;
 import static gitlet.Commit.getBlobIdSet;
 import static gitlet.Stage.getBlobById;
 import static gitlet.Utils.*;
@@ -96,25 +94,15 @@ public class Repository {
         }
         //创建blob的时候用的绝对路径。
         Blob blob = new Blob(file);
-        storeBlob(blob);
-    }
-    //判断是绝对路径还是相对路径,返回绝对路径。
-    private static File getFileFromCWD(String fileName) {
-        return Paths.get(fileName).isAbsolute() ? new File(fileName) : join(CWD, fileName);
-    }
-
-    private static void storeBlob(Blob blob){
         currCommit = readCurrCommit();
         addStage = readStage(ADDSTAGE_FILE);
         removeStage = readStage(REMOVESTAGE_FILE);
-        //如果currcommit里面没有,并且addstage里面没有
-        if(!currCommit.getPathToBlobID().containsValue(blob.getId())
-                && addStage.isNewBlob(blob)){
-            //removestage里有
-            if(!removeStage.isNewBlob(blob)){
-                removeStage.delete(blob);
-                removeStage.saveStage(REMOVESTAGE_FILE);
-            }
+        if(removeStage.exists(file.getPath())){
+            removeStage.delete(blob);
+            removeStage.saveStage(REMOVESTAGE_FILE);
+        }
+        //如果文件版本和commit中的不一样
+        if(!currCommit.getPathToBlobID().containsValue(blob.getId())){
             blob.save();
             if(addStage.isFilePathExists(blob.getFilePath())){
                 addStage.delete(blob.getFilePath());
@@ -122,6 +110,11 @@ public class Repository {
             addStage.add(blob);
             addStage.saveStage(ADDSTAGE_FILE);
         }
+
+    }
+    //判断是绝对路径还是相对路径,返回绝对路径。
+    private static File getFileFromCWD(String fileName) {
+        return Paths.get(fileName).isAbsolute() ? new File(fileName) : join(CWD, fileName);
     }
 
     private static Commit readCurrCommit(){
@@ -205,8 +198,8 @@ public class Repository {
         if(addStage.exists(filePath)){
             addStage.delete(filePath);
             addStage.saveStage(ADDSTAGE_FILE);
-        } else if (currCommit.exists(fileName)) {
-            String removeBlobId = currCommit.getPathToBlobID().get(fileName);
+        } else if (currCommit.exists(filePath)) {
+            String removeBlobId = currCommit.getPathToBlobID().get(filePath);
             Blob removeBlob = getBlobById(removeBlobId);
             removeStage.add(removeBlob);
             removeStage.saveStage(REMOVESTAGE_FILE);
@@ -280,10 +273,12 @@ public class Repository {
         currCommit = readCurrCommit();
         Commit newCommit = readCommitByBranchName(branchName);
         changeCommit(newCommit);
+        currCommit = newCommit;
         changeBranch(branchName);
     }
 
     private static void changeBranch(String branchName) {
+        writeContents(HEAD_FILE, branchName);
     }
 
     private static void changeCommit(Commit newCommit) {
@@ -372,5 +367,124 @@ public class Repository {
             System.out.println("File does not exist in that commit.");
             System.exit(0);
         }
+    }
+
+    public static void status() {
+        printBranches();
+        addStage = readStage(ADDSTAGE_FILE);
+        removeStage = readStage(REMOVESTAGE_FILE);
+        Set<String> addStagePath = addStage.getPathToBlobID().keySet();
+        Set<String> removeStagePath = removeStage.getPathToBlobID().keySet();
+
+        System.out.println("=== Staged Files ===");
+        printStageFile(addStagePath);
+        System.out.println("=== Removed Files ===");
+        printStageFile(removeStagePath);
+
+        currCommit = readCurrCommit();
+        printUnstagedFile();
+        printUntrackedFile();
+    }
+
+    private static void printUntrackedFile() {
+        System.out.println("=== Untracked Files ===");
+        List<String> untracked = new ArrayList<>();
+        List<String> allFiles = plainFilenamesIn(CWD);
+        for(String fileName : allFiles){
+            File currFile = getFileFromCWD(fileName);
+            if(!addStage.exists(currFile.getPath())){
+                if(!currCommit.exists(currFile.getPath())){
+                    untracked.add(currFile.getName());
+                }else {
+                    if (removeStage.exists(currFile.getPath())){
+                        untracked.add(currFile.getName());
+                    }
+                }
+            }
+        }
+        Collections.sort(untracked);
+        for(String name : untracked){
+            System.out.println(name);
+        }
+        System.out.println();
+    }
+
+    private static void printUnstagedFile() {
+        System.out.println("=== Modifications Not Staged For Commit ===");
+        List<String> unstaged = new ArrayList<>();
+        List<String> allFiles = plainFilenamesIn(CWD);
+        for(String fileName : allFiles){
+            File currFile = getFileFromCWD(fileName);
+            Blob currBlob = new Blob(currFile);
+            if(currCommit.exists(currFile.getPath()) &&
+                !currCommit.getPathToBlobID().containsValue(currBlob.getId()) &&
+                    ((!addStage.getPathToBlobID().containsValue(currBlob.getId()) && addStage.exists(currFile.getPath()) )  ||
+                !addStage.exists(currFile.getPath()))){
+                unstaged.add(fileName + " (modified)");
+            }
+        }
+        for(String addFile : addStage.getPathToBlobID().keySet()){
+            File file = new File(addFile);
+            if(!allFiles.contains(file.getName())){
+                unstaged.add(file.getName() + " (deleted)");
+            }
+        }
+        for(String commitFile : currCommit.getPathToBlobID().keySet()){
+            File file = new File(commitFile);
+            if(!allFiles.contains(file.getName()) && !removeStage.exists(commitFile)){
+                if(!unstaged.contains(file.getName() + " (deleted)")){
+                    unstaged.add(file.getName() + " (deleted)");
+                }
+            }
+        }
+        Collections.sort(unstaged);
+        for(String name : unstaged){
+            System.out.println(name);
+        }
+        System.out.println();
+    }
+
+    private static void printStageFile(Set<String> filePath) {
+        List<String> fileName = new ArrayList<>();
+        for(String path : filePath){
+            File file = new File(path);
+            fileName.add(file.getName());
+        }
+        Collections.sort(fileName);
+        for(String name : fileName){
+            System.out.println(name);
+        }
+        System.out.println();
+    }
+
+    private static void printBranches() {
+        List<String> branchList = plainFilenamesIn(HEADS_DIR);
+        currBranch = readCurrBranch();
+        System.out.println("=== Branches ===");
+        System.out.println("*"  + currBranch);
+        for(String branch : branchList){
+            if(branch.equals(currBranch))
+                continue;
+            else
+                System.out.println(branch);
+        }
+        System.out.println();
+    }
+
+    public static void global_log() {
+        List<String> commitList = plainFilenamesIn(OBJECT_DIR);
+        Commit commit;
+        for(String id : commitList){
+            commit = readCommitById(id);
+            if(commit.getParents().size() == 2){
+                printMergeCommit(commit);
+            }else {
+                printCommit(commit);
+            }
+        }
+    }
+
+    public static void find(String arg) {
+
     }
 }
