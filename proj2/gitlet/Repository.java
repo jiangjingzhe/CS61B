@@ -301,8 +301,7 @@ public class Repository {
         for(String id : onlyInNew){
             Blob blob = getBlobById(id);
             if(blob.getFileName().exists() && !currBlobName.contains(blob.getFileName().getName())){
-                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                System.exit(0);
+                unTreackedError();
             }
         }
         deleteFile(onlyInCurr);
@@ -639,21 +638,18 @@ public class Repository {
             File file = join(CWD, fileName);
             for(String id : deleteId){
                 Blob blob = getBlobById(id);
-                if(blob.getFileName().getName() == fileName){
-                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                    System.exit(0);
+                if(blob.getFileName().getName().equals(fileName)){
+                    unTreackedError();
                 }
             }
             for(String id : writeId){
                 Blob blob = getBlobById(id);
-                if(blob.getFileName().getName() == fileName){
-                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                    System.exit(0);
+                if(blob.getFileName().getName().equals(fileName)){
+                    unTreackedError();
                 }
             }
             if(conflict.contains(file.getPath())){
-                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                System.exit(0);
+                unTreackedError();
             }
         }
         deleteFile(deleteId);
@@ -680,6 +676,10 @@ public class Repository {
             System.out.println("Encountered a merge conflict.");
         }
         return newMap;
+    }
+    private static void unTreackedError(){
+        System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+        System.exit(0);
     }
     private static void printfile(Commit c){
         System.out.println(c.getMessage()+"///");
@@ -774,5 +774,20 @@ public class Repository {
             ancestors.add(com.getId());
         }
         return ancestors;
+    }
+
+    public static void addRemote(String arg, String arg1) {
+    }
+
+    public static void rmRemote(String arg) {
+    }
+
+    public static void push(String arg, String arg1) {
+    }
+
+    public static void fetch(String arg, String arg1) {
+    }
+
+    public static void pull(String arg, String arg1) {
     }
 }
