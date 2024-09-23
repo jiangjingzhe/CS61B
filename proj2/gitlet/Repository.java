@@ -1,6 +1,7 @@
 package gitlet;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.*;
@@ -27,9 +28,6 @@ public class Repository {
      */
 
     /** The current working directory. */
-    public static final File CWD = new File(System.getProperty("user.dir"));
-    /** The .gitlet directory. */
-    public static final File GITLET_DIR = join(CWD, ".gitlet");
 
     /* TODO: fill in the rest of this class. */
     /*
@@ -41,19 +39,38 @@ public class Repository {
      *      |         |--master ->(记录当前分支最新的commitId)
      *      |--HEAD ->(记录currBranch)
      *      |--stage
+     *      |--REMOTES_DIR
      */
     // .gitlet directory
-    public static final File OBJECT_DIR = join(GITLET_DIR, "object");
-    public static final File REFS_DIR = join(GITLET_DIR, "refs");
-    public static final File HEADS_DIR = join(REFS_DIR, "heads");
-    public static final File HEAD_FILE = join(GITLET_DIR, "HEAD");
-    public static final File ADDSTAGE_FILE = join(GITLET_DIR, "add_stage");
-    public static final File REMOVESTAGE_FILE = join(GITLET_DIR, "remove_stage");
+    public static File CWD;
+    /** The .gitlet directory. */
+    public static File GITLET_DIR;
+    public static File OBJECT_DIR;
+    public static File REFS_DIR;
+    public static File HEADS_DIR;
+    public static File HEAD_FILE;
+    public static File ADDSTAGE_FILE;
+    public static File REMOVESTAGE_FILE;
+    public static File REMOTES_DIR;
+    public static File CONFIG;
 
     public static Commit currCommit;
     public static Stage addStage;
     public static Stage removeStage;
     public static String currBranch;
+
+    public static void configDIR(File WORK_DIR){
+        CWD = WORK_DIR;
+        GITLET_DIR = join(CWD, ".gitlet");
+        OBJECT_DIR = join(GITLET_DIR, "object");
+        REFS_DIR = join(GITLET_DIR, "refs");
+        HEADS_DIR = join(REFS_DIR, "heads");
+        HEAD_FILE = join(GITLET_DIR, "HEAD");
+        ADDSTAGE_FILE = join(GITLET_DIR, "add_stage");
+        REMOVESTAGE_FILE = join(GITLET_DIR, "remove_stage");
+        REMOTES_DIR = join(GITLET_DIR, "remotes");
+        CONFIG = join(GITLET_DIR, "config");
+    }
 
     public static void init(){
         if(GITLET_DIR.exists()){
@@ -64,6 +81,7 @@ public class Repository {
         OBJECT_DIR.mkdirs();
         REFS_DIR.mkdirs();
         HEADS_DIR.mkdirs();
+        REMOTES_DIR.mkdirs();
         initCommit();
         initHEAD();
         initHeads();
@@ -776,13 +794,125 @@ public class Repository {
         return ancestors;
     }
 
-    public static void addRemote(String arg, String arg1) {
+    public static void addRemote(String remoteName, String remotePath) {
+        File remote = join(REMOTES_DIR, remoteName);
+        if (remote.exists()) {
+            System.out.println("A remote with that name already exists.");
+            System.exit(0);
+        }
+        remote.mkdir();
+
+        // java.io.File.separator
+        if (File.separator.equals("\\")) {
+            remotePath = remotePath.replaceAll("/", "\\\\\\\\");
+        }
+
+        /*
+        [remote "origin"]
+	        url = ..\\remotegit\\.git
+	        fetch = +refs/heads/*:refs/remotes/origin/*
+         */
+        String content = readContentsAsString(CONFIG);
+        content += "[remote \"" + remoteName + "\"]\n";
+        content += remotePath + "\n";
+
+        writeContents(CONFIG, content);
     }
 
-    public static void rmRemote(String arg) {
+    public static void rmRemote(String remoteName) {
+        File remote = join(REMOTES_DIR, remoteName);
+        if (!remote.exists()) {
+            System.out.println("A remote with that name does not exist.");
+            System.exit(0);
+        }
+
+        remote.delete();
+
+        String[] contents = readContentsAsString(CONFIG).split("\n");
+        String target = "[remote \"" + remoteName + "\"]";;
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < contents.length;) {
+            if (contents[i].equals(target)) {
+                i += 2;
+            } else {
+                sb.append(contents[i]);
+            }
+        }
+        writeContents(CONFIG, sb.toString());
     }
 
-    public static void push(String arg, String arg1) {
+    public static void push(String remoteName, String remoteBranchName) {
+        File remotePath = getRemotePath(remoteName);
+
+        currCommit = readCurrCommit();
+        Set<String> history = bfsFromCommit(currCommit);
+        //change to remote CWD
+        configDIR(new File(remotePath.getParent()));
+        Commit remoteHead = readCurrCommit();
+        if (!history.contains(remoteHead.getId())) {
+            System.out.println("Please pull down remote changes before pushing.");
+            System.exit(0);
+        }
+
+        // If the Gitlet system on the remote machine exists
+        // but does not have the input branch,
+        // then simply add the branch to the remote Gitlet.
+        File remoteBranch = join(HEADS_DIR, remoteBranchName);
+        if (!remoteBranch.exists()) {
+            branch(remoteBranchName);
+        }
+
+        // append the future commits to the remote branch.
+        configDIR(new File(System.getProperty("user.dir")));
+        for (String commitId : history) {
+            if (commitId.equals(remoteHead.getId())) {
+                break;
+            }
+            Commit commit = readCommitById(commitId);
+            configDIR(new File(remotePath.getParent()));
+            File remoteCommit = join(OBJECT_DIR, commitId);
+            writeObject(remoteCommit, commit);
+            configDIR(new File(System.getProperty("user.dir")));
+            if (!commit.getPathToBlobID().isEmpty()) {
+                for (Map.Entry<String, String> item: commit.getPathToBlobID().entrySet()) {
+                    String blobId = item.getValue();
+                    Blob blob = getBlobById(blobId);
+                    configDIR(new File(remotePath.getParent()));
+                    File remoteBlob = join(OBJECT_DIR, blobId);
+                    writeObject(remoteBlob, blob);
+                }
+            }
+        }
+
+        // Then, the remote should reset to the front of the appended commits
+        // (so its head will be the same as the local head).
+        configDIR(new File(remotePath.getParent()));
+        reset(currCommit.getId());
+        configDIR(new File(System.getProperty("user.dir")));
+    }
+    private static File getRemotePath(String remoteName) {
+        String path = "";
+        String[] contents = readContentsAsString(CONFIG).split("\n");
+        for (int i = 0; i < contents.length;) {
+            if (contents[i].contains(remoteName)) {
+                path = contents[i + 1];
+                break;
+            } else {
+                i += 2;
+            }
+        }
+
+        File file = null;
+        try {
+            file = new File(path).getCanonicalFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        if (path.equals("") || !file.exists()) {
+            System.out.println("Remote directory not found.");
+            System.exit(0);
+        }
+        return file;
     }
 
     public static void fetch(String arg, String arg1) {

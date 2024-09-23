@@ -1,5 +1,9 @@
 package gitlet;
 
+import java.io.File;
+
+import static gitlet.Repository.configDIR;
+
 /** Driver class for Gitlet, a subset of the Git version-control system.
  *  @author TODO
  */
@@ -14,6 +18,7 @@ public class Main {
             System.exit(0);
         }
         String firstArg = args[0];
+        configDIR(new File(System.getProperty("user.dir")));
         switch(firstArg) {
             case "init":
                 validArgs(args, 1);
