@@ -153,7 +153,7 @@ public class Repository {
         newCommit.save();
         clearAllStage();
         String currBranch = readCurrBranch();
-        writeContents(join(HEADS_DIR, currBranch), currCommit.getId());
+        writeContents(join(HEADS_DIR, currBranch), newCommit.getId());
     }
 
     private static Commit newCommit(String arg) {
@@ -389,6 +389,15 @@ public class Repository {
 
     private static void printUntrackedFile() {
         System.out.println("=== Untracked Files ===");
+        List<String> untracked = getUntrackedFiles();
+        for(String name : untracked){
+            System.out.println(name);
+        }
+        System.out.println();
+    }
+    private static List<String> getUntrackedFiles(){
+        addStage = readStage(ADDSTAGE_FILE);
+        removeStage = readStage(REMOVESTAGE_FILE);
         List<String> untracked = new ArrayList<>();
         List<String> allFiles = plainFilenamesIn(CWD);
         for(String fileName : allFiles){
@@ -404,10 +413,7 @@ public class Repository {
             }
         }
         Collections.sort(untracked);
-        for(String name : untracked){
-            System.out.println(name);
-        }
-        System.out.println();
+        return untracked;
     }
 
     private static void printUnstagedFile() {
@@ -526,13 +532,17 @@ public class Repository {
             System.out.println("Cannot remove the current branch.");
             System.exit(0);
         }
+        checkIfBranchExists(branchName);
+        File fileName = join(HEADS_DIR, branchName);
+        fileName.delete();
+    }
+
+    private static void checkIfBranchExists(String branchName) {
         List<String> allBranch = plainFilenamesIn(HEADS_DIR);
         if (!allBranch.contains(branchName)) {
             System.out.println("A branch with that name does not exist.");
             System.exit(0);
         }
-        File fileName = join(HEADS_DIR, branchName);
-        fileName.delete();
     }
 
     public static void reset(String commitId) {
@@ -546,5 +556,223 @@ public class Repository {
         currBranch = readCurrBranch();
         File branchFile = join(HEADS_DIR, currBranch);
         writeContents(branchFile, commitId);
+    }
+
+    public static void merge(String mergeBranch) {
+        currBranch = readCurrBranch();
+        currCommit = readCurrCommit();
+        addStage = readStage(ADDSTAGE_FILE);
+        removeStage = readStage(REMOVESTAGE_FILE);
+        if(!addStage.isEmpty() || !removeStage.isEmpty()){
+            System.out.println("You have uncommitted changes.");
+            System.exit(0);
+        }
+        checkIfBranchExists(mergeBranch);
+        if (currBranch.equals(mergeBranch)) {
+            System.out.println("Cannot merge a branch with itself.");
+            System.exit(0);
+        }
+        Commit mergeCommit = readCommitByBranchName(mergeBranch);
+        Commit splitPoint = findSplitPoint(currCommit, mergeCommit);
+        if(splitPoint == null){
+            System.out.println("Cannot find splitPoint.");
+            System.exit(0);
+        }
+        //
+        if(splitPoint.getId().equals(mergeCommit.getId())){
+            System.out.println("Given branch is an ancestor of the current branch.");
+            System.exit(0);
+        }
+        if(splitPoint.getId().equals(currCommit.getId())){
+            System.out.println("Current branch fast-forwarded.");
+            checkoutBranch(mergeBranch);
+            return;
+        }
+        String message = "Merged " + mergeBranch + " into " + currBranch + ".";
+        List<String> parents = new ArrayList<>(List.of(currCommit.getId(), mergeCommit.getId()));
+        Map<String, String> mergedCommitMap = mergeToNewCommit(splitPoint, currCommit, mergeCommit);
+        //printfile(splitPoint);
+        //printfile(currCommit);
+        //printfile(mergeCommit);
+        Commit newCommit = new Commit(message, mergedCommitMap, parents);
+        //printfile(newCommit);
+
+        saveNewCommit(newCommit);
+    }
+
+    private static Map<String, String> mergeToNewCommit(Commit splitPoint, Commit currCommit, Commit mergeCommit) {
+        Set<String> allFiles = getAllFiles(splitPoint, currCommit, mergeCommit);
+        Set<String> deleteId = new HashSet<>(); //blobId
+        Set<String> writeId = new HashSet<>(); //blobId
+        Set<String> stopTrack = new HashSet<>();
+        Map<String, String> newTrack = new HashMap<>();
+        Set<String> conflict = new HashSet<>(); //path
+        Map<String, String> newMap = new HashMap<>(currCommit.getPathToBlobID());
+
+        for(String filePath : allFiles){
+            String spId = splitPoint.getPathToBlobID().getOrDefault(filePath, "");
+            String currId = currCommit.getPathToBlobID().getOrDefault(filePath, "");
+            String merId = mergeCommit.getPathToBlobID().getOrDefault(filePath, "");
+            //case 2,3,7
+            if(currId.equals(merId) || spId.equals(merId)){
+                continue;
+            }
+            //case 1,6
+            if(spId.equals(currId)){
+                //case 6
+                if(merId.equals("")){
+                    deleteId.add(spId);
+                    stopTrack.add(filePath);
+                    //System.out.println(filePath+"//stoptrack");
+                }else {
+                    writeId.add(merId);
+                    newTrack.put(filePath, merId);
+                    //System.out.println(filePath+"//newtrack");
+                }
+            }else {
+                conflict.add(filePath);
+            }
+        }
+
+        List<String> untrackedFiles = getUntrackedFiles();
+        for(String fileName : untrackedFiles){
+            File file = join(CWD, fileName);
+            for(String id : deleteId){
+                Blob blob = getBlobById(id);
+                if(blob.getFileName().getName() == fileName){
+                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                    System.exit(0);
+                }
+            }
+            for(String id : writeId){
+                Blob blob = getBlobById(id);
+                if(blob.getFileName().getName() == fileName){
+                    System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                    System.exit(0);
+                }
+            }
+            if(conflict.contains(file.getPath())){
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                System.exit(0);
+            }
+        }
+        deleteFile(deleteId);
+        writeFile(writeId);
+        for(String i : stopTrack){
+            newMap.remove(i);
+        }
+        for(String i : newTrack.keySet()){
+            newMap.put(i, newTrack.get(i));
+        }
+        for(String filePath : conflict){
+            //System.out.println(filePath+"conflict????????????");
+            String currId = currCommit.getPathToBlobID().getOrDefault(filePath, "");
+            String merId = mergeCommit.getPathToBlobID().getOrDefault(filePath, "");
+            String newContent = getContentAsStringFromBlobId(currId);
+            String mergContent = getContentAsStringFromBlobId(merId);
+            String content = getConflictFile(newContent.split("\n"), mergContent.split("\n"));
+            File file = new File(filePath);
+            //更新文件内容
+            writeContents(file, content);
+            //更新blobId
+            Blob blob = new Blob(file);
+            newMap.put(filePath, blob.getId());
+            System.out.println("Encountered a merge conflict.");
+        }
+        return newMap;
+    }
+    private static void printfile(Commit c){
+        System.out.println(c.getMessage()+"///");
+        for(String i : c.getPathToBlobID().keySet()){
+            Blob blob = getBlobById(c.getPathToBlobID().get(i));
+            System.out.print(blob.getFileName().getName()+" ");
+        }
+        System.out.println();
+    }
+
+    private static String getConflictFile(String[] head, String[] other) {
+        StringBuffer sb = new StringBuffer();
+        int len1 = head.length, len2 = other.length;
+        int i = 0, j = 0;
+        while (i < len1 && j < len2) {
+            if (head[i].equals(other[j])) {
+                sb.append(head[i]);
+            } else {
+                sb.append(getConflictContent(head[i], other[j]));
+            }
+            i++;
+            j++;
+        }
+        // head.len > other.len
+        while (i < len1) {
+            sb.append(getConflictContent(head[i], ""));
+            i++;
+        }
+        // head.len < other.len
+        while (j < len1) {
+            sb.append(getConflictContent("", other[j]));
+            j++;
+        }
+        return sb.toString();
+    }
+
+    private static String getConflictContent(String head, String other) {
+        StringBuffer sb = new StringBuffer();
+        sb.append("<<<<<<< HEAD\n");
+        // contents of file in current branch
+        sb.append(head.equals("") ? head : head + "\n");
+        sb.append("=======\n");
+        // contents of file in given branch
+        sb.append(other.equals("") ? other : other + "\n");
+        sb.append(">>>>>>>\n");
+        return sb.toString();
+    }
+
+    private static String getContentAsStringFromBlobId(String blobId) {
+        if (blobId.equals("")) {
+            return "";
+        }
+        return getBlobById(blobId).getContentAsString();
+    }
+
+    private static Set<String> getAllFiles(Commit a, Commit b, Commit c){
+        Set<String> set = new HashSet<>();
+        set.addAll(a.getPathToBlobID().keySet());
+        set.addAll(b.getPathToBlobID().keySet());
+        set.addAll(c.getPathToBlobID().keySet());
+        return set;
+    }
+    private static Commit findSplitPoint(Commit commit1, Commit commit2) {
+        Set<String> ancestors = bfsFromCommit(commit1);
+        Queue<Commit> queue = new LinkedList<>();
+        queue.add(commit2);
+        while (!queue.isEmpty()){
+            Commit com = queue.poll();
+            if(ancestors.contains(com.getId())){
+                return com;
+            }
+            if(!com.getParents().isEmpty()){
+                for(String parent : com.getParents()){
+                    queue.add(readCommitById(parent));
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Set<String> bfsFromCommit(Commit commit) {
+        Set<String> ancestors = new HashSet<>();
+        Queue<Commit> queue = new LinkedList<>();
+        queue.add(commit);
+        while(!queue.isEmpty()){
+            Commit com = queue.poll();
+            if(!ancestors.contains(com.getId()) && !com.getParents().isEmpty()){
+                for(String parent : com.getParents()){
+                    queue.add(readCommitById(parent));
+                }
+            }
+            ancestors.add(com.getId());
+        }
+        return ancestors;
     }
 }

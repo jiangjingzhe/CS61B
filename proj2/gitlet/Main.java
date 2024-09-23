@@ -94,6 +94,11 @@ public class Main {
                 Repository.checkIfInitialized();
                 Repository.reset(args[1]);
                 break;
+            case "merge":
+                validArgs(args, 2);
+                Repository.checkIfInitialized();
+                Repository.merge(args[1]);
+                break;
             default:
                 System.out.println("No command with that name exists.");
                 System.exit(0);
