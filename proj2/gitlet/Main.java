@@ -3,6 +3,7 @@ package gitlet;
 import java.io.File;
 
 import static gitlet.Repository.configDIR;
+import static gitlet.Repository.pull;
 
 /** Driver class for Gitlet, a subset of the Git version-control system.
  *  @author TODO
@@ -127,7 +128,7 @@ public class Main {
             case "pull":
                 validArgs(args, 3);
                 Repository.checkIfInitialized();
-                Repository.pull(args[1], args[2]);
+                pull(args[1], args[2]);
                 break;
             default:
                 System.out.println("No command with that name exists.");

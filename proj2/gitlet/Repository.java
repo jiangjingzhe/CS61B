@@ -85,6 +85,7 @@ public class Repository {
         initCommit();
         initHEAD();
         initHeads();
+        writeContents(CONFIG, "");
     }
     private static void initCommit(){
         Commit initCommit = new Commit();
@@ -277,14 +278,14 @@ public class Repository {
     }
 
     public static void checkoutBranch(String branchName) {
+        File branchFile = getBranchFile(branchName);
         /* * checkout [branch name] */
         currBranch = readCurrBranch();
         if(branchName.equals(currBranch)){
             System.out.println("No need to checkout the current branch.");
             System.exit(0);
         }
-        List<String> allBranch = plainFilenamesIn(HEADS_DIR);
-        if(!allBranch.contains(branchName)){
+        if(!branchFile.exists()){
             System.out.println("No such branch exists.");
             System.exit(0);
         }
@@ -318,8 +319,12 @@ public class Repository {
         }
         for(String id : onlyInNew){
             Blob blob = getBlobById(id);
-            if(blob.getFileName().exists() && !currBlobName.contains(blob.getFileName().getName())){
-                unTreackedError();
+            if(!currBlobName.contains(blob.getFileName().getName()) &&
+                    blob.getFileName().exists()){
+                Blob b = new Blob(blob.getFileName());
+                if(!b.getId().equals(id)){
+                    unTreackedError();
+                }
             }
         }
         deleteFile(onlyInCurr);
@@ -355,7 +360,8 @@ public class Repository {
     }
 
     private static Commit readCommitByBranchName(String branchName) {
-        String newCommitId = readContentsAsString(join(HEADS_DIR, branchName));
+        File branchFile = getBranchFile(branchName);
+        String newCommitId = readContentsAsString(branchFile);
         return readCommitById(newCommitId);
     }
 
@@ -538,7 +544,7 @@ public class Repository {
             System.out.println("A branch with that name already exists.");
             System.exit(0);
         }
-        File newBranchFile = join(HEADS_DIR, branchName);
+        File newBranchFile = getBranchFile(branchName);
         currCommit = readCurrCommit();
         writeContents(newBranchFile, currCommit.getId());
     }
@@ -550,13 +556,13 @@ public class Repository {
             System.exit(0);
         }
         checkIfBranchExists(branchName);
-        File fileName = join(HEADS_DIR, branchName);
+        File fileName = getBranchFile(branchName);
         fileName.delete();
     }
 
     private static void checkIfBranchExists(String branchName) {
-        List<String> allBranch = plainFilenamesIn(HEADS_DIR);
-        if (!allBranch.contains(branchName)) {
+        File branchFile = getBranchFile(branchName);
+        if (!branchFile.exists()) {
             System.out.println("A branch with that name does not exist.");
             System.exit(0);
         }
@@ -589,6 +595,7 @@ public class Repository {
             System.out.println("Cannot merge a branch with itself.");
             System.exit(0);
         }
+
         Commit mergeCommit = readCommitByBranchName(mergeBranch);
         Commit splitPoint = findSplitPoint(currCommit, mergeCommit);
         if(splitPoint == null){
@@ -608,11 +615,7 @@ public class Repository {
         String message = "Merged " + mergeBranch + " into " + currBranch + ".";
         List<String> parents = new ArrayList<>(List.of(currCommit.getId(), mergeCommit.getId()));
         Map<String, String> mergedCommitMap = mergeToNewCommit(splitPoint, currCommit, mergeCommit);
-        //printfile(splitPoint);
-        //printfile(currCommit);
-        //printfile(mergeCommit);
         Commit newCommit = new Commit(message, mergedCommitMap, parents);
-        //printfile(newCommit);
 
         saveNewCommit(newCommit);
     }
@@ -795,7 +798,7 @@ public class Repository {
     }
 
     public static void addRemote(String remoteName, String remotePath) {
-        File remote = join(REMOTES_DIR, remoteName);
+        File remote = join(HEADS_DIR, remoteName);
         if (remote.exists()) {
             System.out.println("A remote with that name already exists.");
             System.exit(0);
@@ -820,7 +823,7 @@ public class Repository {
     }
 
     public static void rmRemote(String remoteName) {
-        File remote = join(REMOTES_DIR, remoteName);
+        File remote = join(HEADS_DIR, remoteName);
         if (!remote.exists()) {
             System.out.println("A remote with that name does not exist.");
             System.exit(0);
@@ -851,30 +854,36 @@ public class Repository {
         Commit remoteHead = readCurrCommit();
         if (!history.contains(remoteHead.getId())) {
             System.out.println("Please pull down remote changes before pushing.");
+            configDIR(new File(System.getProperty("user.dir")));
             System.exit(0);
         }
 
         // If the Gitlet system on the remote machine exists
         // but does not have the input branch,
         // then simply add the branch to the remote Gitlet.
-        File remoteBranch = join(HEADS_DIR, remoteBranchName);
+        File remoteBranch = getBranchFile(remoteBranchName);
         if (!remoteBranch.exists()) {
-            branch(remoteBranchName);
+            //本地的currCommit
+            writeContents(remoteBranch, currCommit.getId());
         }
 
         // append the future commits to the remote branch.
-        configDIR(new File(System.getProperty("user.dir")));
         for (String commitId : history) {
             if (commitId.equals(remoteHead.getId())) {
                 break;
             }
+            configDIR(new File(System.getProperty("user.dir")));
+
             Commit commit = readCommitById(commitId);
+
             configDIR(new File(remotePath.getParent()));
+
             File remoteCommit = join(OBJECT_DIR, commitId);
             writeObject(remoteCommit, commit);
-            configDIR(new File(System.getProperty("user.dir")));
+
             if (!commit.getPathToBlobID().isEmpty()) {
                 for (Map.Entry<String, String> item: commit.getPathToBlobID().entrySet()) {
+                    configDIR(new File(System.getProperty("user.dir")));
                     String blobId = item.getValue();
                     Blob blob = getBlobById(blobId);
                     configDIR(new File(remotePath.getParent()));
@@ -886,6 +895,8 @@ public class Repository {
 
         // Then, the remote should reset to the front of the appended commits
         // (so its head will be the same as the local head).
+        configDIR(new File(System.getProperty("user.dir")));
+        currCommit = readCurrCommit();
         configDIR(new File(remotePath.getParent()));
         reset(currCommit.getId());
         configDIR(new File(System.getProperty("user.dir")));
@@ -915,9 +926,64 @@ public class Repository {
         return file;
     }
 
-    public static void fetch(String arg, String arg1) {
-    }
+    public static void fetch(String remoteName, String remoteBranchName) {
+        File remotePath = getRemotePath(remoteName);
+        configDIR(new File(remotePath.getParent()));
+        File remoteBranchFile = getBranchFile(remoteBranchName);
+        if (remoteBranchFile == null || !remoteBranchFile.exists()) {
+            System.out.println("That remote does not have that branch.");
+            configDIR(new File(System.getProperty("user.dir")));
+            System.exit(0);
+        }
 
-    public static void pull(String arg, String arg1) {
+        Commit remoteBranchCommit = readCommitByBranchName(remoteBranchName);
+
+        // This branch is created in the local repository if it did not previously exist.
+        // just update remotes/[remote]/[remote branch] file to new Commit id.
+        configDIR(new File(System.getProperty("user.dir")));
+        File branch = join(HEADS_DIR, remoteName, remoteBranchName);
+        writeContents(branch, remoteBranchCommit.getId());
+
+        // fetch down all commits and blobs
+        configDIR(new File(remotePath.getParent()));
+        Set<String> history = bfsFromCommit(remoteBranchCommit);
+
+        for (String commitId : history) {
+            configDIR(new File(remotePath.getParent()));
+            Commit commit = readCommitById(commitId);
+            configDIR(new File(System.getProperty("user.dir")));
+            File commitFile = join(OBJECT_DIR, commit.getId());
+            if (commitFile.exists()) {
+                continue;
+            }
+            writeObject(commitFile, commit);
+
+            if (commit.getPathToBlobID().isEmpty()) {
+                continue;
+            }
+            for (Map.Entry<String, String> item: commit.getPathToBlobID().entrySet()) {
+                String blobId = item.getValue();
+                configDIR(new File(remotePath.getParent()));
+                Blob blob = getBlobById(blobId);
+                configDIR(new File(System.getProperty("user.dir")));
+                File blobFile = join(OBJECT_DIR, blobId);
+                writeObject(blobFile, blob);
+            }
+        }
+        configDIR(new File(System.getProperty("user.dir")));
+    }
+    private static File getBranchFile(String branchName) {
+        File file = null;
+        String[] branches = branchName.split("/");
+        if (branches.length == 1) {
+            file = join(HEADS_DIR, branchName);
+        } else if (branches.length == 2) {
+            file = join(HEADS_DIR, branches[0], branches[1]);
+        }
+        return file;
+    }
+    public static void pull(String remoteName, String remoteBranchName) {
+        fetch(remoteName, remoteBranchName);
+        merge(remoteName + "/" + remoteBranchName);
     }
 }
