@@ -852,6 +852,8 @@ public class Repository {
         //change to remote CWD
         configDIR(new File(remotePath.getParent()));
         Commit remoteHead = readCurrCommit();
+        Set<String> remoteHistory = bfsFromCommit(remoteHead);
+
         if (!history.contains(remoteHead.getId())) {
             System.out.println("Please pull down remote changes before pushing.");
             configDIR(new File(System.getProperty("user.dir")));
@@ -863,14 +865,18 @@ public class Repository {
         // then simply add the branch to the remote Gitlet.
         File remoteBranch = getBranchFile(remoteBranchName);
         if (!remoteBranch.exists()) {
-            //本地的currCommit
-            writeContents(remoteBranch, currCommit.getId());
+            branch(remoteBranchName);
         }
+        configDIR(new File(System.getProperty("user.dir")));
+        currCommit = readCurrCommit();
+        configDIR(new File(remotePath.getParent()));
+        writeContents(remoteBranch, currCommit.getId());
 
         // append the future commits to the remote branch.
+        history.removeAll(remoteHistory);
         for (String commitId : history) {
             if (commitId.equals(remoteHead.getId())) {
-                break;
+                continue;
             }
             configDIR(new File(System.getProperty("user.dir")));
 
